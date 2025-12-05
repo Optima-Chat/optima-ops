@@ -1,7 +1,7 @@
 //! Route definitions for the web dashboard
 
 use axum::{
-    extract::State,
+    extract::{Path, Query, State},
     response::{Html, IntoResponse},
     routing::{get, post},
     Router,
@@ -29,9 +29,13 @@ pub fn create_router() -> Router<AppState> {
         .route("/api/environment", post(set_environment))
         .route("/api/environment", get(get_environment))
         .route("/api/infrastructure", get(api_infrastructure))
+        .route("/api/containers", get(api_containers))
+        .route("/api/containers/{name}/restart", post(api_container_restart))
         .route("/partials/services", get(partial_services))
         .route("/partials/header", get(partial_header))
         .route("/partials/infrastructure", get(partial_infrastructure))
+        .route("/partials/containers", get(partial_containers))
+        .route("/partials/container-logs", get(partial_container_logs))
 }
 
 /// Dashboard template
@@ -320,6 +324,155 @@ async fn partial_infrastructure(State(_state): State<AppState>) -> impl IntoResp
         ecs_services,
         rds_instances,
         last_updated: status.last_updated.unwrap_or_else(|| "-".to_string()),
+    };
+
+    Html(template.render().unwrap_or_default())
+}
+
+// ============== Container Management ==============
+
+/// Container info for templates
+struct ContainerInfo {
+    id: String,
+    name: String,
+    status: String,
+    ports: String,
+    status_class: String,
+}
+
+/// Mock container data (will use SSH when configured)
+fn get_mock_containers() -> Vec<ContainerInfo> {
+    vec![
+        ContainerInfo {
+            id: "abc123def456".to_string(),
+            name: "optima-user-auth-prod".to_string(),
+            status: "Up 5 hours".to_string(),
+            ports: "8292/tcp".to_string(),
+            status_class: "bg-green-100 text-green-800".to_string(),
+        },
+        ContainerInfo {
+            id: "def456ghi789".to_string(),
+            name: "optima-commerce-backend-prod".to_string(),
+            status: "Up 5 hours".to_string(),
+            ports: "8293/tcp".to_string(),
+            status_class: "bg-green-100 text-green-800".to_string(),
+        },
+        ContainerInfo {
+            id: "ghi789jkl012".to_string(),
+            name: "optima-mcp-host-prod".to_string(),
+            status: "Up 5 hours".to_string(),
+            ports: "8294/tcp".to_string(),
+            status_class: "bg-green-100 text-green-800".to_string(),
+        },
+        ContainerInfo {
+            id: "jkl012mno345".to_string(),
+            name: "optima-agentic-chat-prod".to_string(),
+            status: "Up 3 hours".to_string(),
+            ports: "8296/tcp".to_string(),
+            status_class: "bg-green-100 text-green-800".to_string(),
+        },
+    ]
+}
+
+/// API endpoint: list containers (JSON)
+async fn api_containers(State(_state): State<AppState>) -> impl IntoResponse {
+    let containers = get_mock_containers();
+    let json_containers: Vec<serde_json::Value> = containers
+        .into_iter()
+        .map(|c| {
+            json!({
+                "id": c.id,
+                "name": c.name,
+                "status": c.status,
+                "ports": c.ports
+            })
+        })
+        .collect();
+    Json(json_containers)
+}
+
+/// API endpoint: restart container
+async fn api_container_restart(
+    State(_state): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    // In real implementation, this would use SSHClient to restart the container
+    // For now, just return success
+    Json(json!({
+        "success": true,
+        "message": format!("Container {} restart initiated", name),
+        "note": "Mock response - SSH not configured"
+    }))
+}
+
+/// Containers partial template
+#[derive(Template)]
+#[template(path = "partials/containers.html")]
+struct ContainersTemplate {
+    containers: Vec<ContainerInfo>,
+    error: Option<String>,
+    last_updated: String,
+}
+
+/// HTMX partial: containers list
+async fn partial_containers(State(_state): State<AppState>) -> impl IntoResponse {
+    let containers = get_mock_containers();
+
+    let template = ContainersTemplate {
+        containers,
+        error: None,
+        last_updated: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+    };
+
+    Html(template.render().unwrap_or_default())
+}
+
+/// Container logs query params
+#[derive(Debug, Deserialize)]
+struct ContainerLogsQuery {
+    name: String,
+    tail: Option<u32>,
+}
+
+/// Container logs partial template
+#[derive(Template)]
+#[template(path = "partials/container_logs.html")]
+struct ContainerLogsTemplate {
+    container_name: String,
+    logs: String,
+    tail: u32,
+    error: Option<String>,
+}
+
+/// HTMX partial: container logs
+async fn partial_container_logs(
+    State(_state): State<AppState>,
+    Query(params): Query<ContainerLogsQuery>,
+) -> impl IntoResponse {
+    let tail = params.tail.unwrap_or(50);
+
+    // Mock logs - in real implementation, this would use SSHClient
+    let mock_logs = format!(
+        r#"2025-12-05T10:00:00.000Z INFO  Starting {}...
+2025-12-05T10:00:01.000Z INFO  Loading configuration...
+2025-12-05T10:00:02.000Z INFO  Connecting to database...
+2025-12-05T10:00:03.000Z INFO  Database connection established
+2025-12-05T10:00:04.000Z INFO  Starting HTTP server on port 8000
+2025-12-05T10:00:05.000Z INFO  Server ready to accept connections
+2025-12-05T10:01:00.000Z INFO  Received health check request
+2025-12-05T10:02:00.000Z INFO  Received health check request
+2025-12-05T10:03:00.000Z INFO  Received health check request
+2025-12-05T10:04:00.000Z INFO  Processing API request: GET /api/users
+2025-12-05T10:04:01.000Z INFO  Request completed in 45ms
+[Mock logs - SSH not configured]"#,
+        params.name
+    );
+
+    let template = ContainerLogsTemplate {
+        container_name: params.name,
+        logs: mock_logs,
+        tail,
+        error: None,
     };
 
     Html(template.render().unwrap_or_default())

@@ -1,0 +1,67 @@
+<div class="space-y-4">
+    <!-- Container List -->
+    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">容器名</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">端口</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+                {% for container in containers %}
+                <tr>
+                    <td class="whitespace-nowrap px-3 py-2 text-sm">
+                        <div class="font-medium text-gray-900">{{ container.name }}</div>
+                        <div class="text-xs text-gray-500 font-mono">{{ container.id }}</div>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-sm">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ container.status_class }}">
+                            {{ container.status }}
+                        </span>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500 font-mono">{{ container.ports }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-sm">
+                        <div class="flex space-x-2">
+                            <button
+                                class="text-blue-600 hover:text-blue-800"
+                                hx-get="/partials/container-logs?name={{ container.name }}&tail=50"
+                                hx-target="#logs-modal-content"
+                                hx-swap="innerHTML"
+                                onclick="document.getElementById('logs-modal').classList.remove('hidden')">
+                                日志
+                            </button>
+                            <button
+                                class="text-yellow-600 hover:text-yellow-800"
+                                hx-post="/api/containers/{{ container.name }}/restart"
+                                hx-confirm="确定要重启容器 {{ container.name }} 吗？"
+                                hx-swap="none">
+                                重启
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if containers.is_empty() %}
+                <tr>
+                    <td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">
+                        {% match error %}
+                        {% when Some with (err) %}
+                        <span class="text-red-600">{{ err }}</span>
+                        {% when None %}
+                        暂无容器
+                        {% endmatch %}
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Last Updated -->
+    <div class="text-xs text-gray-400 text-right">
+        最后更新: {{ last_updated }}
+    </div>
+</div>

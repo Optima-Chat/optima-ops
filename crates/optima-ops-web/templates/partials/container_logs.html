@@ -1,0 +1,42 @@
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h3 class="text-lg font-medium text-gray-900">{{ container_name }} 日志</h3>
+        <button
+            onclick="document.getElementById('logs-modal').classList.add('hidden')"
+            class="text-gray-400 hover:text-gray-500">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="bg-gray-900 rounded-lg p-4 overflow-auto max-h-96">
+        <pre class="text-sm text-green-400 font-mono whitespace-pre-wrap">{{ logs }}</pre>
+    </div>
+
+    {% match error %}
+    {% when Some with (err) %}
+    <div class="text-red-600 text-sm">{{ err }}</div>
+    {% when None %}
+    {% endmatch %}
+
+    <div class="flex justify-between items-center">
+        <div class="text-xs text-gray-400">显示最后 {{ tail }} 行</div>
+        <div class="flex space-x-2">
+            <button
+                class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+                hx-get="/partials/container-logs?name={{ container_name }}&tail=100"
+                hx-target="#logs-modal-content"
+                hx-swap="innerHTML">
+                更多日志
+            </button>
+            <button
+                class="px-3 py-1 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded"
+                hx-get="/partials/container-logs?name={{ container_name }}&tail={{ tail }}"
+                hx-target="#logs-modal-content"
+                hx-swap="innerHTML">
+                刷新
+            </button>
+        </div>
+    </div>
+</div>
