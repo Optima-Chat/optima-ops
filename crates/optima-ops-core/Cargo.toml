@@ -9,7 +9,7 @@ description = "Core shared library for Optima Ops CLI and Web Dashboard"
 [features]
 default = []
 # Enable real AWS SDK integration (slower compile time)
-aws = ["dep:aws-config", "dep:aws-sdk-ecs", "dep:aws-sdk-ec2", "dep:aws-sdk-elasticloadbalancingv2", "dep:aws-sdk-rds"]
+aws = ["dep:aws-config", "dep:aws-sdk-ecs", "dep:aws-sdk-ec2", "dep:aws-sdk-elasticloadbalancingv2", "dep:aws-sdk-rds", "dep:aws-sdk-cloudwatch"]
 
 [dependencies]
 # Async Runtime
@@ -35,6 +35,7 @@ aws-sdk-ecs = { workspace = true, optional = true }
 aws-sdk-ec2 = { workspace = true, optional = true }
 aws-sdk-elasticloadbalancingv2 = { workspace = true, optional = true }
 aws-sdk-rds = { workspace = true, optional = true }
+aws-sdk-cloudwatch = { workspace = true, optional = true }
 
 # Logging
 tracing = { workspace = true }

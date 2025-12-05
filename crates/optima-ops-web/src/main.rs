@@ -7,6 +7,7 @@ use axum::Router;
 use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
+mod filters;
 mod routes;
 mod state;
 

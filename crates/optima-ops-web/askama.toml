@@ -1,0 +1,5 @@
+[general]
+dirs = ["templates"]
+
+[filters]
+mod_path = "crate::filters"

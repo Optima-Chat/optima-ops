@@ -1,0 +1,89 @@
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Instance
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Environment
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CPU
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Memory
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CPU History (24h)
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                </th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for instance in instances %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">{{ instance.instance_name }}</div>
+                    <div class="text-xs text-gray-400">{{ instance.instance_id }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="text-sm text-gray-700">{{ instance.environment }}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% match instance.cpu_current %}
+                    {% when Some with (cpu) %}
+                    <div class="flex items-center">
+                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ cpu }}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-700">{{ cpu|round(1) }}%</span>
+                    </div>
+                    {% when None %}
+                    <span class="text-sm text-gray-400">N/A</span>
+                    {% endmatch %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% match instance.memory_current %}
+                    {% when Some with (mem) %}
+                    <div class="flex items-center">
+                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: {{ mem }}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-700">{{ mem|round(1) }}%</span>
+                    </div>
+                    {% when None %}
+                    <span class="text-sm text-gray-400">N/A</span>
+                    {% endmatch %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="sparkline text-lg" title="CPU usage over 24 hours">{{ instance.cpu_sparkline() }}</span>
+                    {% match instance.cpu_avg_1h %}
+                    {% when Some with (avg) %}
+                    <span class="text-xs text-gray-400 ml-2">Avg: {{ avg|round(1) }}%</span>
+                    {% when None %}
+                    {% endmatch %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if instance.state == "running" %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="w-1.5 h-1.5 mr-1.5 bg-green-500 rounded-full"></span>
+                        Running
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        {{ instance.state }}
+                    </span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="px-6 py-3 bg-gray-50 text-right text-xs text-gray-400">
+    Last updated: {{ last_updated }}
+</div>

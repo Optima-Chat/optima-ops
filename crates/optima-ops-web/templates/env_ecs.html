@@ -1,0 +1,238 @@
+{% extends "base_with_sidebar.html" %}
+
+{% block title %}{{ env_display_name }} - Optima Ops{% endblock %}
+
+{% block page_title %}{{ env_display_name }}{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center space-x-4">
+    {% match cluster_name %}
+    {% when Some with (cluster) %}
+    <span class="text-sm text-gray-500">Cluster: {{ cluster }}</span>
+    {% when None %}
+    {% endmatch %}
+    <button
+        class="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+        hx-get="/partials/ecs/{{ env_type }}/services"
+        hx-target="#services-content"
+        hx-swap="innerHTML">
+        Refresh
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Cluster Summary -->
+{% match cluster_summary %}
+{% when Some with (summary) %}
+<div class="bg-white rounded-lg shadow mb-6">
+    <div class="px-6 py-4">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div>
+                <p class="text-sm text-gray-500">Running Tasks</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.running_tasks }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Container Instances</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.container_instances }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Active Services</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.active_services }}</p>
+            </div>
+            {% match summary.avg_cpu %}
+            {% when Some with (cpu) %}
+            <div>
+                <p class="text-sm text-gray-500">Avg CPU</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ cpu|round(1) }}%</p>
+            </div>
+            {% when None %}
+            {% endmatch %}
+            {% match summary.avg_memory %}
+            {% when Some with (mem) %}
+            <div>
+                <p class="text-sm text-gray-500">Avg Memory</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ mem|round(1) }}%</p>
+            </div>
+            {% when None %}
+            {% endmatch %}
+        </div>
+    </div>
+</div>
+{% when None %}
+{% endmatch %}
+
+<!-- Core Services -->
+{% if !core_services.is_empty() %}
+<div class="bg-white rounded-lg shadow mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">Core Services</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasks</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Domain</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for service in core_services %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ service.display_name }}</div>
+                        <div class="text-xs text-gray-400">{{ service.name }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            1/1
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% match service.domain %}
+                        {% when Some with (domain) %}
+                        <a href="https://{{ domain }}" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">{{ domain }}</a>
+                        {% when None %}
+                        <span class="text-sm text-gray-400">-</span>
+                        {% endmatch %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <a href="https://ap-southeast-1.console.aws.amazon.com/ecs/v2/clusters/{{ cluster_name|default("") }}/services/{{ service.name }}/logs" target="_blank" class="text-blue-600 hover:text-blue-800 mr-3">Logs</a>
+                        {% match service.github_repo %}
+                        {% when Some with (repo) %}
+                        <a href="https://github.com/{{ repo }}/actions" target="_blank" class="text-gray-600 hover:text-gray-800">Deploy</a>
+                        {% when None %}
+                        {% endmatch %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- MCP Tools -->
+{% if !mcp_services.is_empty() %}
+<div class="bg-white rounded-lg shadow mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">MCP Tools</h2>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {% for service in mcp_services %}
+            <div class="border rounded-lg p-3 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="font-medium text-gray-900 text-sm truncate" title="{{ service.display_name }}">{{ service.display_name }}</h3>
+                    <span class="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
+                </div>
+                {% match service.domain %}
+                {% when Some with (domain) %}
+                <p class="text-xs text-gray-400 truncate" title="{{ domain }}">{{ domain }}</p>
+                {% when None %}
+                {% endmatch %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- BI Services -->
+{% if !bi_services.is_empty() %}
+<div class="bg-white rounded-lg shadow mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">BI Services</h2>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% for service in bi_services %}
+            <div class="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-medium text-gray-900">{{ service.display_name }}</h3>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        Running
+                    </span>
+                </div>
+                {% match service.domain %}
+                {% when Some with (domain) %}
+                <a href="https://{{ domain }}" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">{{ domain }}</a>
+                {% when None %}
+                {% endmatch %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Migration Tasks -->
+{% if !migration_tasks.is_empty() %}
+<div class="bg-white rounded-lg shadow mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">Migration Tasks</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Run</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for task in migration_tasks %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ task.display_name }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        -
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Ready
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button class="text-blue-600 hover:text-blue-800"
+                                hx-post="/api/migrations/{{ task.name }}/run?env={{ env_type }}"
+                                hx-confirm="Run migration {{ task.display_name }}?"
+                                hx-swap="none">
+                            Run
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Scheduled Tasks -->
+{% if !scheduled_tasks.is_empty() %}
+<div class="bg-white rounded-lg shadow">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">Scheduled Tasks</h2>
+    </div>
+    <div class="p-6">
+        {% for task in scheduled_tasks %}
+        <div class="flex items-center justify-between py-2">
+            <div>
+                <span class="font-medium text-gray-900">{{ task.display_name }}</span>
+                <span class="text-sm text-gray-500 ml-2">(hourly)</span>
+            </div>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Active
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
