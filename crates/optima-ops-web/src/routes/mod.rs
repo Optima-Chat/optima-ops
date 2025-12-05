@@ -11,7 +11,10 @@ use axum::{
 use askama::Template;
 use serde::Deserialize;
 use serde_json::json;
-use optima_ops_core::{Environment, InfraClient};
+use optima_ops_core::{
+    default_deployment_services, get_status_class, get_status_text,
+    DeploymentService, Environment, GitHubClient, InfraClient, WorkflowRun,
+};
 
 use crate::state::AppState;
 
@@ -31,11 +34,15 @@ pub fn create_router() -> Router<AppState> {
         .route("/api/infrastructure", get(api_infrastructure))
         .route("/api/containers", get(api_containers))
         .route("/api/containers/{name}/restart", post(api_container_restart))
+        // Deployment routes
+        .route("/api/deployments", get(api_deployments))
+        .route("/api/deployments/{service}/trigger", post(api_trigger_deployment))
         .route("/partials/services", get(partial_services))
         .route("/partials/header", get(partial_header))
         .route("/partials/infrastructure", get(partial_infrastructure))
         .route("/partials/containers", get(partial_containers))
         .route("/partials/container-logs", get(partial_container_logs))
+        .route("/partials/deployments", get(partial_deployments))
 }
 
 /// Dashboard template
@@ -560,4 +567,241 @@ async fn partial_container_logs(
             Html(template.render().unwrap_or_default())
         }
     }
+}
+
+// ============== Deployment Management ==============
+
+/// Deployment service info for templates
+struct DeploymentInfo {
+    name: String,
+    display_name: String,
+    repo: String,
+    workflow_file: String,
+    repo_url: String,
+    workflow_url: String,
+    latest_run: Option<RunInfo>,
+    recent_runs: Vec<RunInfo>,
+}
+
+/// Workflow run info for templates
+struct RunInfo {
+    id: i64,
+    status: String,
+    status_text: String,
+    status_class: String,
+    conclusion: Option<String>,
+    html_url: String,
+    created_at: String,
+    created_date: String,  // Just the date part for display
+    actor: String,
+    event: String,
+    display_title: String,
+}
+
+impl From<WorkflowRun> for RunInfo {
+    fn from(run: WorkflowRun) -> Self {
+        let status_class = get_status_class(&run.status, run.conclusion.as_deref());
+        let status_text = get_status_text(&run.status, run.conclusion.as_deref());
+
+        // Extract just the date part (YYYY-MM-DD) from ISO timestamp
+        let created_date = run.created_at.split('T').next()
+            .unwrap_or(&run.created_at)
+            .to_string();
+
+        RunInfo {
+            id: run.id,
+            status: run.status,
+            status_text: status_text.to_string(),
+            status_class: status_class.to_string(),
+            conclusion: run.conclusion,
+            html_url: run.html_url,
+            created_at: run.created_at,
+            created_date,
+            actor: run.actor.login,
+            event: run.event,
+            display_title: run.display_title.unwrap_or_else(|| run.name),
+        }
+    }
+}
+
+/// Get GitHub client from environment
+fn get_github_client() -> GitHubClient {
+    GitHubClient::new(None) // Will use GITHUB_TOKEN env var
+}
+
+/// API endpoint: get all deployment statuses
+async fn api_deployments() -> impl IntoResponse {
+    let client = get_github_client();
+    let services = default_deployment_services();
+    let mut results = Vec::new();
+
+    for service in &services {
+        let status = client.get_deployment_status(service).await;
+        match status {
+            Ok(s) => {
+                results.push(json!({
+                    "service": s.service.name,
+                    "display_name": s.service.display_name,
+                    "repo": s.service.repo,
+                    "workflow_url": s.workflow_url,
+                    "repo_url": s.repo_url,
+                    "latest_run": s.latest_run,
+                    "recent_runs": s.recent_runs,
+                }));
+            }
+            Err(e) => {
+                results.push(json!({
+                    "service": service.name,
+                    "display_name": service.display_name,
+                    "error": e.to_string(),
+                }));
+            }
+        }
+    }
+
+    Json(json!({
+        "success": true,
+        "authenticated": client.is_authenticated(),
+        "deployments": results
+    }))
+}
+
+/// Trigger deployment request
+#[derive(Debug, Deserialize)]
+struct TriggerDeploymentForm {
+    environment: Option<String>,
+}
+
+/// API endpoint: trigger deployment for a service
+async fn api_trigger_deployment(
+    Path(service_name): Path<String>,
+    Form(form): Form<TriggerDeploymentForm>,
+) -> impl IntoResponse {
+    let client = get_github_client();
+
+    if !client.is_authenticated() {
+        return Json(json!({
+            "success": false,
+            "error": "GitHub token not configured. Set GITHUB_TOKEN environment variable."
+        }));
+    }
+
+    let services = default_deployment_services();
+    let service = services.iter().find(|s| s.name == service_name);
+
+    let service = match service {
+        Some(s) => s,
+        None => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Service '{}' not found", service_name)
+            }));
+        }
+    };
+
+    let parts: Vec<&str> = service.repo.split('/').collect();
+    if parts.len() != 2 {
+        return Json(json!({
+            "success": false,
+            "error": format!("Invalid repo format: {}", service.repo)
+        }));
+    }
+    let (owner, repo) = (parts[0], parts[1]);
+
+    // Build inputs
+    let environment = form.environment.unwrap_or_else(|| "stage".to_string());
+    let inputs = json!({
+        "environment": environment
+    });
+
+    match client
+        .trigger_workflow(owner, repo, &service.workflow_file, "main", Some(inputs))
+        .await
+    {
+        Ok(_) => Json(json!({
+            "success": true,
+            "message": format!("Deployment triggered for {} ({})", service.display_name, environment),
+            "workflow_url": format!("https://github.com/{}/actions/workflows/{}", service.repo, service.workflow_file)
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "error": e.to_string()
+        })),
+    }
+}
+
+/// Deployments partial template
+#[derive(Template)]
+#[template(path = "partials/deployments.html")]
+struct DeploymentsTemplate {
+    deployments: Vec<DeploymentInfo>,
+    authenticated: bool,
+    error: Option<String>,
+    last_updated: String,
+}
+
+/// HTMX partial: deployments grid
+async fn partial_deployments() -> impl IntoResponse {
+    let client = get_github_client();
+    let services = default_deployment_services();
+    let authenticated = client.is_authenticated();
+    let last_updated = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+    let mut deployments = Vec::new();
+    let mut global_error: Option<String> = None;
+
+    for service in &services {
+        match client.get_deployment_status(service).await {
+            Ok(status) => {
+                let latest_run = status.latest_run.map(RunInfo::from);
+                let recent_runs: Vec<RunInfo> = status
+                    .recent_runs
+                    .into_iter()
+                    .skip(1) // Skip first since it's already in latest_run
+                    .take(4) // Show up to 4 more runs
+                    .map(RunInfo::from)
+                    .collect();
+
+                deployments.push(DeploymentInfo {
+                    name: service.name.clone(),
+                    display_name: service.display_name.clone(),
+                    repo: service.repo.clone(),
+                    workflow_file: service.workflow_file.clone(),
+                    repo_url: status.repo_url,
+                    workflow_url: status.workflow_url,
+                    latest_run,
+                    recent_runs,
+                });
+            }
+            Err(e) => {
+                // Still add the service but with no run info
+                deployments.push(DeploymentInfo {
+                    name: service.name.clone(),
+                    display_name: service.display_name.clone(),
+                    repo: service.repo.clone(),
+                    workflow_file: service.workflow_file.clone(),
+                    repo_url: format!("https://github.com/{}", service.repo),
+                    workflow_url: format!(
+                        "https://github.com/{}/actions/workflows/{}",
+                        service.repo, service.workflow_file
+                    ),
+                    latest_run: None,
+                    recent_runs: Vec::new(),
+                });
+
+                if global_error.is_none() {
+                    global_error = Some(e.to_string());
+                }
+            }
+        }
+    }
+
+    let template = DeploymentsTemplate {
+        deployments,
+        authenticated,
+        error: global_error,
+        last_updated,
+    };
+
+    Html(template.render().unwrap_or_default())
 }
