@@ -14,33 +14,38 @@ use std::path::PathBuf;
 use crate::utils::expand_tilde;
 
 /// Environment type for deployment targets
+///
+/// 当前可用环境:
+/// - Production: ec2-prod.optima.shop (Docker Compose)
+/// - Shared: shared.optima.onl (Infisical, BuildKit)
+///
+/// 注意: Stage 环境已迁移到 ECS，不再需要 SSH 访问
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Environment {
     Production,
-    Stage,
     Shared,
-    Development,
 }
 
 impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Production => "production",
-            Environment::Stage => "stage",
             Environment::Shared => "shared",
-            Environment::Development => "development",
         }
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "production" | "prod" => Some(Environment::Production),
-            "stage" | "staging" => Some(Environment::Stage),
             "shared" => Some(Environment::Shared),
-            "development" | "dev" => Some(Environment::Development),
             _ => None,
         }
+    }
+
+    /// 获取所有可用环境
+    pub fn all() -> &'static [Environment] {
+        &[Environment::Production, Environment::Shared]
     }
 
     pub fn get_env_info(&self) -> EnvInfo {
@@ -50,20 +55,10 @@ impl Environment {
                 rds_host: "optima-prod-postgres.ctg866o0ehac.ap-southeast-1.rds.amazonaws.com",
                 docker_network: "optima-prod",
             },
-            Environment::Stage => EnvInfo {
-                ec2_host: "ec2-stage.optima.shop",
-                rds_host: "optima-stage-postgres.ctg866o0ehac.ap-southeast-1.rds.amazonaws.com",
-                docker_network: "optima-stage",
-            },
             Environment::Shared => EnvInfo {
                 ec2_host: "shared.optima.onl",
                 rds_host: "",
                 docker_network: "optima-shared",
-            },
-            Environment::Development => EnvInfo {
-                ec2_host: "ec2-dev.optima.shop",
-                rds_host: "optima-dev-postgres.ctg866o0ehac.ap-southeast-1.rds.amazonaws.com",
-                docker_network: "optima-dev",
             },
         }
     }
@@ -110,9 +105,7 @@ pub struct ConfigFile {
 #[derive(Debug, Clone, Deserialize)]
 pub struct EC2ConfigMap {
     pub production: EC2Config,
-    pub stage: EC2Config,
     pub shared: EC2Config,
-    pub development: EC2Config,
 }
 
 /// Service type classification
@@ -207,9 +200,7 @@ impl AppConfig {
         let env = env.unwrap_or(self.current_env);
         match env {
             Environment::Production => &self.config.ec2.production,
-            Environment::Stage => &self.config.ec2.stage,
             Environment::Shared => &self.config.ec2.shared,
-            Environment::Development => &self.config.ec2.development,
         }
     }
 
@@ -282,18 +273,8 @@ impl AppConfig {
                     user: "ec2-user".to_string(),
                     key_path: "~/.ssh/optima-ec2-key".to_string(),
                 },
-                stage: EC2Config {
-                    host: "ec2-stage.optima.shop".to_string(),
-                    user: "ec2-user".to_string(),
-                    key_path: "~/.ssh/optima-ec2-key".to_string(),
-                },
                 shared: EC2Config {
                     host: "shared.optima.onl".to_string(),
-                    user: "ec2-user".to_string(),
-                    key_path: "~/.ssh/optima-ec2-key".to_string(),
-                },
-                development: EC2Config {
-                    host: "ec2-dev.optima.shop".to_string(),
                     user: "ec2-user".to_string(),
                     key_path: "~/.ssh/optima-ec2-key".to_string(),
                 },

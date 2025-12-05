@@ -45,13 +45,11 @@ impl AppState {
         }
     }
 
-    /// Get all available environments
+    /// Get all available environments (only SSH-accessible EC2 instances)
     pub fn available_environments() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("production", "Production"),
-            ("stage", "Stage"),
-            ("shared", "Shared"),
-            ("development", "Development"),
+            ("production", "Production (ec2-prod.optima.shop)"),
+            ("shared", "Shared (shared.optima.onl)"),
         ]
     }
 

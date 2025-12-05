@@ -171,9 +171,7 @@ async fn set_environment(
 ) -> impl IntoResponse {
     let env = match form.environment.as_str() {
         "production" => Environment::Production,
-        "stage" => Environment::Stage,
         "shared" => Environment::Shared,
-        "development" => Environment::Development,
         _ => Environment::Production,
     };
 
