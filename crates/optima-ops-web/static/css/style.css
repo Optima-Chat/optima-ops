@@ -1,0 +1,38 @@
+/* Custom styles for Optima Ops Dashboard */
+
+/* Loading indicator animation */
+.htmx-request .htmx-indicator {
+    display: inline-block;
+}
+
+.htmx-indicator {
+    display: none;
+}
+
+/* Status colors */
+.status-healthy {
+    color: #22c55e;
+}
+
+.status-unhealthy {
+    color: #ef4444;
+}
+
+.status-unknown {
+    color: #eab308;
+}
+
+/* Service card hover effect */
+.service-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Transition utilities */
+.transition-shadow {
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-in-out;
+}

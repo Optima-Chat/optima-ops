@@ -1,0 +1,119 @@
+<div class="space-y-6">
+    <!-- EC2 Instances -->
+    <div>
+        <h3 class="text-sm font-medium text-gray-700 mb-3">EC2 实例</h3>
+        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-300">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">名称</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">实例类型</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">私有IP</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                    {% for ec2 in ec2_instances %}
+                    <tr>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-900">
+                            <div class="font-medium">{{ ec2.name }}</div>
+                            <div class="text-xs text-gray-500">{{ ec2.instance_id }}</div>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500">{{ ec2.instance_type }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500 font-mono">{{ ec2.private_ip }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ ec2.state_class }}">
+                                {{ ec2.state }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if ec2_instances.is_empty() %}
+                    <tr>
+                        <td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">暂无 EC2 实例</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ECS Services -->
+    <div>
+        <h3 class="text-sm font-medium text-gray-700 mb-3">ECS 服务</h3>
+        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-300">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">服务名</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">集群</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">任务数</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                    {% for svc in ecs_services %}
+                    <tr>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{{ svc.service_name }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500">{{ svc.cluster }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500">
+                            {{ svc.running_count }} / {{ svc.desired_count }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ svc.status_class }}">
+                                {{ svc.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if ecs_services.is_empty() %}
+                    <tr>
+                        <td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">暂无 ECS 服务</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- RDS Instances -->
+    <div>
+        <h3 class="text-sm font-medium text-gray-700 mb-3">RDS 数据库</h3>
+        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-300">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">标识符</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">引擎</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">实例类型</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                    {% for rds in rds_instances %}
+                    <tr>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{{ rds.identifier }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500">{{ rds.engine }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-500">{{ rds.instance_class }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-sm">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ rds.status_class }}">
+                                {{ rds.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if rds_instances.is_empty() %}
+                    <tr>
+                        <td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">暂无 RDS 实例</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Last Updated -->
+    <div class="text-xs text-gray-400 text-right">
+        最后更新: {{ last_updated }}
+    </div>
+</div>

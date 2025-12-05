@@ -1,0 +1,23 @@
+<div class="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow">
+    <div class="p-5">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900">{{ name }}</h3>
+                <p class="text-sm text-gray-500">{{ service_type }}</p>
+            </div>
+            <div class="flex-shrink-0">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ status_class }}">
+                    {{ status }}
+                </span>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+            <p class="text-xs text-gray-400 truncate flex-1" title="{{ health_endpoint }}">
+                {{ health_endpoint }}
+            </p>
+            {% if let Some(time) = response_time %}
+            <span class="ml-2 text-xs text-gray-500">{{ time }}ms</span>
+            {% endif %}
+        </div>
+    </div>
+</div>

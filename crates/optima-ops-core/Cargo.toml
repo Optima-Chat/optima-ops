@@ -1,0 +1,48 @@
+[package]
+name = "optima-ops-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core shared library for Optima Ops CLI and Web Dashboard"
+
+[features]
+default = []
+# Enable real AWS SDK integration (slower compile time)
+aws = ["dep:aws-config", "dep:aws-sdk-ecs", "dep:aws-sdk-ec2", "dep:aws-sdk-elasticloadbalancingv2", "dep:aws-sdk-rds"]
+
+[dependencies]
+# Async Runtime
+tokio = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# SSH
+ssh2 = { workspace = true }
+
+# AWS SDK (optional - enable with "aws" feature)
+aws-config = { workspace = true, optional = true }
+aws-sdk-ecs = { workspace = true, optional = true }
+aws-sdk-ec2 = { workspace = true, optional = true }
+aws-sdk-elasticloadbalancingv2 = { workspace = true, optional = true }
+aws-sdk-rds = { workspace = true, optional = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+regex = { workspace = true }
+dirs = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

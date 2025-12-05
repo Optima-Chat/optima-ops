@@ -1,0 +1,46 @@
+[package]
+name = "optima-ops-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Command-line interface for Optima Ops"
+
+[[bin]]
+name = "optima-ops"
+path = "src/main.rs"
+
+[dependencies]
+# Internal crates
+optima-ops-core = { workspace = true }
+
+# Async Runtime
+tokio = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# CLI Framework
+clap = { workspace = true }
+colored = { workspace = true }
+comfy-table = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# AWS SDK
+aws-config = { workspace = true }
+aws-sdk-ecs = { workspace = true }
+aws-sdk-ec2 = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }

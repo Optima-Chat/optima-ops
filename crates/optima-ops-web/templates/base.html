@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Optima Ops{% endblock %}</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+
+    <!-- HTMX (CDN with local fallback) -->
+    <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+        }
+        .htmx-indicator {
+            display: none;
+        }
+        .status-healthy { color: #22c55e; }
+        .status-unhealthy { color: #ef4444; }
+        .status-unknown { color: #eab308; }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-gray-50">
+    {% block body %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,69 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/optima-ops-core",
+    "crates/optima-ops-cli",
+    "crates/optima-ops-web",
+]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+authors = ["Optima Team"]
+license = "MIT"
+
+[workspace.dependencies]
+# Async Runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# HTTP Client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# SSH
+ssh2 = "0.9"
+
+# AWS SDK
+aws-config = { version = "1.1", features = ["behavior-version-latest"] }
+aws-sdk-ecs = "1.15"
+aws-sdk-ec2 = "1.14"
+aws-sdk-elasticloadbalancingv2 = "1.15"
+aws-sdk-rds = "1.14"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+dirs = "5.0"
+
+# CLI specific
+clap = { version = "4.4", features = ["derive", "env"] }
+colored = "2.1"
+comfy-table = "7.1"
+
+# Web specific
+axum = "0.7"
+askama = "0.12"
+askama_axum = "0.4"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+
+# Internal crates
+optima-ops-core = { path = "crates/optima-ops-core" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
