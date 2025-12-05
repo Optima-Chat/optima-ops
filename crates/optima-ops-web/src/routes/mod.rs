@@ -340,69 +340,113 @@ struct ContainerInfo {
     status_class: String,
 }
 
-/// Mock container data (will use SSH when configured)
-fn get_mock_containers() -> Vec<ContainerInfo> {
-    vec![
-        ContainerInfo {
-            id: "abc123def456".to_string(),
-            name: "optima-user-auth-prod".to_string(),
-            status: "Up 5 hours".to_string(),
-            ports: "8292/tcp".to_string(),
-            status_class: "bg-green-100 text-green-800".to_string(),
-        },
-        ContainerInfo {
-            id: "def456ghi789".to_string(),
-            name: "optima-commerce-backend-prod".to_string(),
-            status: "Up 5 hours".to_string(),
-            ports: "8293/tcp".to_string(),
-            status_class: "bg-green-100 text-green-800".to_string(),
-        },
-        ContainerInfo {
-            id: "ghi789jkl012".to_string(),
-            name: "optima-mcp-host-prod".to_string(),
-            status: "Up 5 hours".to_string(),
-            ports: "8294/tcp".to_string(),
-            status_class: "bg-green-100 text-green-800".to_string(),
-        },
-        ContainerInfo {
-            id: "jkl012mno345".to_string(),
-            name: "optima-agentic-chat-prod".to_string(),
-            status: "Up 3 hours".to_string(),
-            ports: "8296/tcp".to_string(),
-            status_class: "bg-green-100 text-green-800".to_string(),
-        },
-    ]
+/// Get status class based on container status string
+fn get_container_status_class(status: &str) -> String {
+    let status_lower = status.to_lowercase();
+    if status_lower.starts_with("up") {
+        "bg-green-100 text-green-800".to_string()
+    } else if status_lower.contains("exited") || status_lower.contains("dead") {
+        "bg-red-100 text-red-800".to_string()
+    } else if status_lower.contains("restarting") || status_lower.contains("paused") {
+        "bg-yellow-100 text-yellow-800".to_string()
+    } else {
+        "bg-gray-100 text-gray-800".to_string()
+    }
+}
+
+/// Fetch real container data via SSH
+async fn fetch_containers_via_ssh(state: &AppState) -> Result<Vec<ContainerInfo>, String> {
+    let mut guard = state.get_ssh_client().await?;
+    let client = guard.as_mut().ok_or("SSH client not initialized")?;
+
+    // Connect if not already connected
+    client.connect().await.map_err(|e| e.to_string())?;
+
+    // Get container status
+    let result = client.get_container_status(None).await.map_err(|e| e.to_string())?;
+
+    if result.exit_code != 0 {
+        return Err(format!("docker ps failed: {}", result.stderr));
+    }
+
+    // Parse the output
+    let containers = optima_ops_core::parse_container_status(&result.stdout);
+
+    Ok(containers
+        .into_iter()
+        .map(|c| ContainerInfo {
+            status_class: get_container_status_class(&c.status),
+            id: c.id,
+            name: c.name,
+            status: c.status,
+            ports: c.ports,
+        })
+        .collect())
 }
 
 /// API endpoint: list containers (JSON)
-async fn api_containers(State(_state): State<AppState>) -> impl IntoResponse {
-    let containers = get_mock_containers();
-    let json_containers: Vec<serde_json::Value> = containers
-        .into_iter()
-        .map(|c| {
-            json!({
-                "id": c.id,
-                "name": c.name,
-                "status": c.status,
-                "ports": c.ports
-            })
-        })
-        .collect();
-    Json(json_containers)
+async fn api_containers(State(state): State<AppState>) -> impl IntoResponse {
+    match fetch_containers_via_ssh(&state).await {
+        Ok(containers) => {
+            let json_containers: Vec<serde_json::Value> = containers
+                .into_iter()
+                .map(|c| {
+                    json!({
+                        "id": c.id,
+                        "name": c.name,
+                        "status": c.status,
+                        "ports": c.ports
+                    })
+                })
+                .collect();
+            Json(json!({ "success": true, "containers": json_containers }))
+        }
+        Err(e) => {
+            Json(json!({ "success": false, "error": e }))
+        }
+    }
 }
 
 /// API endpoint: restart container
 async fn api_container_restart(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
-    // In real implementation, this would use SSHClient to restart the container
-    // For now, just return success
-    Json(json!({
-        "success": true,
-        "message": format!("Container {} restart initiated", name),
-        "note": "Mock response - SSH not configured"
-    }))
+    let mut guard = match state.get_ssh_client().await {
+        Ok(g) => g,
+        Err(e) => return Json(json!({ "success": false, "error": e })),
+    };
+
+    let client = match guard.as_mut() {
+        Some(c) => c,
+        None => return Json(json!({ "success": false, "error": "SSH client not initialized" })),
+    };
+
+    // Connect if not already connected
+    if let Err(e) = client.connect().await {
+        return Json(json!({ "success": false, "error": e.to_string() }));
+    }
+
+    // Execute docker restart command
+    match client.docker_command(&format!("restart {}", name)).await {
+        Ok(result) => {
+            if result.exit_code == 0 {
+                Json(json!({
+                    "success": true,
+                    "message": format!("Container {} restarted successfully", name),
+                    "execution_time_ms": result.execution_time.as_millis()
+                }))
+            } else {
+                Json(json!({
+                    "success": false,
+                    "error": format!("docker restart failed: {}", result.stderr)
+                }))
+            }
+        }
+        Err(e) => {
+            Json(json!({ "success": false, "error": e.to_string() }))
+        }
+    }
 }
 
 /// Containers partial template
@@ -412,19 +456,34 @@ struct ContainersTemplate {
     containers: Vec<ContainerInfo>,
     error: Option<String>,
     last_updated: String,
+    environment: String,
 }
 
 /// HTMX partial: containers list
-async fn partial_containers(State(_state): State<AppState>) -> impl IntoResponse {
-    let containers = get_mock_containers();
+async fn partial_containers(State(state): State<AppState>) -> impl IntoResponse {
+    let env = state.current_environment();
+    let last_updated = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
-    let template = ContainersTemplate {
-        containers,
-        error: None,
-        last_updated: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-    };
-
-    Html(template.render().unwrap_or_default())
+    match fetch_containers_via_ssh(&state).await {
+        Ok(containers) => {
+            let template = ContainersTemplate {
+                containers,
+                error: None,
+                last_updated,
+                environment: env.to_string(),
+            };
+            Html(template.render().unwrap_or_default())
+        }
+        Err(e) => {
+            let template = ContainersTemplate {
+                containers: Vec::new(),
+                error: Some(e),
+                last_updated,
+                environment: env.to_string(),
+            };
+            Html(template.render().unwrap_or_default())
+        }
+    }
 }
 
 /// Container logs query params
@@ -444,36 +503,63 @@ struct ContainerLogsTemplate {
     error: Option<String>,
 }
 
+/// Fetch container logs via SSH
+async fn fetch_container_logs_via_ssh(
+    state: &AppState,
+    container_name: &str,
+    tail: u32,
+) -> Result<String, String> {
+    let mut guard = state.get_ssh_client().await?;
+    let client = guard.as_mut().ok_or("SSH client not initialized")?;
+
+    // Connect if not already connected
+    client.connect().await.map_err(|e| e.to_string())?;
+
+    // Get container logs
+    let result = client
+        .get_container_logs(container_name, Some(tail), false)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if result.exit_code != 0 {
+        return Err(format!("docker logs failed: {}", result.stderr));
+    }
+
+    // Combine stdout and stderr (logs can be in either)
+    let logs = if result.stdout.is_empty() {
+        result.stderr
+    } else {
+        result.stdout
+    };
+
+    Ok(logs)
+}
+
 /// HTMX partial: container logs
 async fn partial_container_logs(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Query(params): Query<ContainerLogsQuery>,
 ) -> impl IntoResponse {
     let tail = params.tail.unwrap_or(50);
 
-    // Mock logs - in real implementation, this would use SSHClient
-    let mock_logs = format!(
-        r#"2025-12-05T10:00:00.000Z INFO  Starting {}...
-2025-12-05T10:00:01.000Z INFO  Loading configuration...
-2025-12-05T10:00:02.000Z INFO  Connecting to database...
-2025-12-05T10:00:03.000Z INFO  Database connection established
-2025-12-05T10:00:04.000Z INFO  Starting HTTP server on port 8000
-2025-12-05T10:00:05.000Z INFO  Server ready to accept connections
-2025-12-05T10:01:00.000Z INFO  Received health check request
-2025-12-05T10:02:00.000Z INFO  Received health check request
-2025-12-05T10:03:00.000Z INFO  Received health check request
-2025-12-05T10:04:00.000Z INFO  Processing API request: GET /api/users
-2025-12-05T10:04:01.000Z INFO  Request completed in 45ms
-[Mock logs - SSH not configured]"#,
-        params.name
-    );
-
-    let template = ContainerLogsTemplate {
-        container_name: params.name,
-        logs: mock_logs,
-        tail,
-        error: None,
-    };
-
-    Html(template.render().unwrap_or_default())
+    match fetch_container_logs_via_ssh(&state, &params.name, tail).await {
+        Ok(logs) => {
+            let template = ContainerLogsTemplate {
+                container_name: params.name,
+                logs,
+                tail,
+                error: None,
+            };
+            Html(template.render().unwrap_or_default())
+        }
+        Err(e) => {
+            let template = ContainerLogsTemplate {
+                container_name: params.name,
+                logs: String::new(),
+                tail,
+                error: Some(e),
+            };
+            Html(template.render().unwrap_or_default())
+        }
+    }
 }
